@@ -1,36 +1,50 @@
-#pragma once
-#include <span>
-#include <ranges>
-#include <concepts>
-#include <memory>
+#ifndef FRAMEBUFFERS_HPP
+#define FRAMEBUFFERS_HPP
 
-template<std::unsigned_integral T = uint16_t>
-class FrameBuffer {
+#include <cstdint>
+#include <array>
+#include <span>
+
+namespace graphics {
+
+class FrameBuffers {
+public:
+    static constexpr size_t SCREEN_WIDTH = 320;
+    static constexpr size_t SCREEN_HEIGHT = 240;
+    static constexpr size_t BUFFER_COUNT = 3;
+    static constexpr size_t BUFFER_SIZE = SCREEN_WIDTH * SCREEN_HEIGHT;
+
+    using PixelType = uint16_t;
+    using BufferArray = std::array<PixelType, BUFFER_SIZE>;
+    using BufferSpan = std::span<PixelType, BUFFER_SIZE>;
+
 private:
-    static constexpr int SCREEN_WIDTH = 320;
-    static constexpr int SCREEN_HEIGHT = 240;
-    static constexpr int BUFFER_COUNT = 3;
-    
-    std::vector<T> buffers[BUFFER_COUNT];
-    size_t currentBuffer = 0;
+    // Guaranteed contiguous memory layout
+    std::array<BufferArray, BUFFER_COUNT> buffers;
 
 public:
-    FrameBuffer() {
-        for(auto& buffer : buffers) {
-            buffer.resize(SCREEN_WIDTH * SCREEN_HEIGHT);
-        }
+    // Modern span-based access
+    [[nodiscard]] constexpr BufferSpan getBuffer(size_t index) noexcept {
+        return BufferSpan{buffers[index]};
     }
 
-    constexpr auto swap() noexcept {
-        currentBuffer = (currentBuffer + 1) % BUFFER_COUNT;
+    // Direct buffer access for legacy code compatibility
+    [[nodiscard]] constexpr PixelType* getBufferPtr(size_t index) noexcept {
+        return buffers[index].data();
     }
 
-    // Using std::span for better view semantics
-    [[nodiscard]] std::span<T> getCurrentBuffer() noexcept {
-        return std::span(buffers[currentBuffer]);
-    }
-
-    void clear(T value = 0) {
-        std::ranges::fill(buffers[currentBuffer], value);
+    // Named accessors for clarity
+    [[nodiscard]] static FrameBuffers& instance() noexcept {
+        static FrameBuffers instance;
+        return instance;
     }
 };
+
+// Compatibility defines for existing code
+inline auto& gFramebuffer0 = FrameBuffers::instance().getBufferPtr(0);
+inline auto& gFramebuffer1 = FrameBuffers::instance().getBufferPtr(1);
+inline auto& gFramebuffer2 = FrameBuffers::instance().getBufferPtr(2);
+
+} // namespace graphics
+
+#endif // FRAMEBUFFERS_HPP
